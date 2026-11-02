@@ -52,39 +52,72 @@ class AbbeyArtsSource(EventSource):
         start: datetime,
         end: datetime | None = None,
     ) -> list[Event]:
+        headers = {
+            "User-Agent": (
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0 Safari/537.36"
+            )
+        }
+
         events: list[Event] = []
 
-        # Primary: Humanitix host inventory. This host URL is public and does not
-        # use the blocked collection URL that previously returned 403.
+        # Humanitix host page is useful when its SSR cards are present.
         try:
-            response = session.get(
-                HOST_URL,
-                timeout=30,
-                headers={
-                    "User-Agent": (
-                        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-                        "AppleWebKit/537.36 (KHTML, like Gecko) "
-                        "Chrome/141.0 Safari/537.36"
-                    )
-                },
-            )
-            response.raise_for_status()
-            events.extend(self.parse_host(response.text))
+            r = session.get(HOST_URL, timeout=30, headers=headers)
+            r.raise_for_status()
+            events.extend(self.parse_host(r.text))
         except Exception:
-            # Fallback: venue/reference Google calendars.
-            for calendar_id in CALENDAR_IDS:
+            pass
+
+        # Always merge both public calendars as a second transport. Do not make
+        # them exception-only fallbacks; Humanitix can return 200 with partial SSR.
+        for calendar_id in CALENDAR_IDS:
+            try:
                 url = (
                     "https://calendar.google.com/calendar/ical/"
                     f"{quote(calendar_id, safe='')}/public/basic.ics"
                 )
-                response = session.get(url, timeout=30)
-                response.raise_for_status()
-                events.extend(self.parse_ics(response.text))
+                r = session.get(url, timeout=30, headers=headers)
+                r.raise_for_status()
+                events.extend(self.parse_ics(r.text))
+            except Exception:
+                continue
 
-        return dedupe(
+        events = self._dedupe_occurrences(events)
+        return [
             e for e in events
             if e.start_at >= start and (end is None or e.start_at <= end)
-        )
+        ]
+
+
+    @staticmethod
+    def _dedupe_occurrences(events: list[Event]) -> list[Event]:
+        # Merge Humanitix and Google Calendar representations of the same
+        # occurrence. Prefer the richer record (ticket URL / description /
+        # Humanitix event URL) while keying on venue-normalized title + date/time.
+        def norm_title(value: str) -> str:
+            value = re.sub(r"^\d{1,2}/\d{1,2}\s+", "", clean(value))
+            value = re.sub(r"\s+@\s+(?:FREMONT ABBEY|BALLARD HOMESTEAD).*$", "", value, flags=re.I)
+            value = re.sub(r"^CANCELLED:\s*", "", value, flags=re.I)
+            return re.sub(r"[^a-z0-9]+", " ", value.casefold()).strip()
+
+        best: dict[tuple[str, str], Event] = {}
+        for event in events:
+            key = (norm_title(event.title), event.start_at.strftime("%Y-%m-%dT%H:%M"))
+            current = best.get(key)
+            if current is None:
+                best[key] = event
+                continue
+            def score(e: Event) -> int:
+                return (
+                    (4 if e.ticket_url else 0)
+                    + (2 if e.description else 0)
+                    + (2 if "humanitix.com/" in (e.event_url or "") else 0)
+                    + (1 if e.end_at else 0)
+                )
+            if score(event) > score(current):
+                best[key] = event
+        return list(best.values())
 
     def parse_host(self, html: str) -> list[Event]:
         soup = BeautifulSoup(html, "html.parser")

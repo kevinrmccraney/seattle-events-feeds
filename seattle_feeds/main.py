@@ -12,6 +12,23 @@ from .rss import write_feed
 from .sources import SOURCES
 from .util import TZ
 
+
+class InventoryBelowExpected(ValueError):
+    pass
+
+
+INVENTORY_MINIMUMS = {
+    "paramount": 50,
+    "neptune": 50,
+    "moore": 25,
+    "substation": 25,
+    "chop-suey": 10,
+    "triple-door": 8,
+    "rabbit-box": 15,
+    "fremont-abbey": 5,
+    "ballard-homestead": 3,
+}
+
 SOURCE_LINKS = {
     "neumos": "https://www.neumos.com/events",
     "barboza": "https://www.thebarboza.com/events",
@@ -33,11 +50,11 @@ SOURCE_LINKS = {
     "rabbit-box": "https://www.therabbitboxseattle.com/events",
     "fremont-abbey": "https://www.fremontabbey.org/calendar/",
     "ballard-homestead": "https://www.fremontabbey.org/calendar/",
-    "paramount": "https://www.stgpresents.org/event-category/paramount/",
-    "neptune": "https://www.stgpresents.org/event-category/neptune/",
-    "moore": "https://www.stgpresents.org/event-category/moore/",
-    "chop-suey": "https://chopsuey.com/",
-    "substation": "https://substationseattle.com/",
+    "paramount": "https://www.axs.com/venues/101582/paramount-theatre-seattle-seattle-tickets",
+    "neptune": "https://www.axs.com/venues/102572/the-neptune-theatre-seattle-tickets",
+    "moore": "https://www.axs.com/venues/101610/the-moore-theatre-seattle-tickets",
+    "chop-suey": "https://www.ticketweb.com/venue/chop-suey-seattle-wa/19270",
+    "substation": "https://www.axs.com/venues/131334/substation-seattle-tickets",
     "central-saloon": "https://centralsaloon.com/events/",
 }
 
@@ -52,6 +69,8 @@ def classify_error(exc: Exception) -> str:
         return "source_http_error"
     if isinstance(exc, requests.RequestException):
         return "source_request_error"
+    if isinstance(exc, InventoryBelowExpected):
+        return "inventory_below_expected"
     if isinstance(exc, (ValueError, KeyError, TypeError)):
         return "source_parse_error"
     return "source_error"
@@ -74,6 +93,12 @@ def generate(output_dir: str = "docs", only: set[str] | None = None) -> int:
             events = source.fetch_events(session, now, None)
             if not events and not source.allow_empty:
                 raise ValueError(f"{source.key}: source returned zero upcoming events")
+            minimum = INVENTORY_MINIMUMS.get(source.key)
+            if minimum is not None and len(events) < minimum:
+                raise InventoryBelowExpected(
+                    f"{source.key}: inventory below expected minimum "
+                    f"({len(events)} < {minimum}); preserving last good feed"
+                )
             feed_path = out / "feeds" / f"{source.key}.xml"
             write_feed(
                 feed_path,
