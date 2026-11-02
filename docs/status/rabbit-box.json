@@ -1,0 +1,8 @@
+{
+  "source": "rabbit-box",
+  "success": false,
+  "generated_at": "2026-11-01T22:37:57.417290-08:00",
+  "code": "source_parse_error",
+  "message": "rabbit-box: source returned zero upcoming events",
+  "exception_type": "ValueError"
+}
