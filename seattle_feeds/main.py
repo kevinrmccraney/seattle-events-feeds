@@ -17,6 +17,10 @@ SOURCE_LINKS = {
     "barboza": "https://www.thebarboza.com/events",
     "vera": "https://theveraproject.org/events/",
     "showbox": "https://www.showboxpresents.com/events/all",
+    "tractor": "https://tractortavern.com/calendar/",
+    "clockout": "https://clockoutlounge.com/",
+    "nectar": "https://nectarlounge.com/events/calendar/",
+    "hidden-hall": "https://nectarlounge.com/events/calendar/",
 }
 
 
@@ -38,7 +42,7 @@ def classify_error(exc: Exception) -> str:
 def generate(output_dir: str = "docs", only: set[str] | None = None) -> int:
     now = datetime.now(TZ)
     session = requests.Session()
-    session.headers.update({"User-Agent": "SeattleEventsFeeds/4.0 (+weekly normalized RSS producer)"})
+    session.headers.update({"User-Agent": "SeattleEventsFeeds/6.0 (+weekly normalized RSS producer)"})
     out = Path(output_dir)
     (out / "feeds").mkdir(parents=True, exist_ok=True)
     (out / "status").mkdir(parents=True, exist_ok=True)

@@ -1,4 +1,4 @@
-# Seattle Events Feed Producers v4
+# Seattle Events Feed Producers v5
 
 This repository contains the venue/API scrapers only. It does **not** write to Supabase.
 Each source is transformed into a normalized RSS 2.0 feed with structured `seattle:*` fields.
@@ -9,6 +9,8 @@ Current feeds:
 - `docs/feeds/barboza.xml` — Carbonhouse
 - `docs/feeds/vera.xml` — DICE; Vera Project + Black Lodge, `music:gig` only
 - `docs/feeds/showbox.xml` — Showbox Presents, Seattle venues only
+- `docs/feeds/tractor.xml` — Tractor Tavern via its public Opendate calendar; Tractor Tavern venue only
+- `docs/feeds/clockout.xml` — Clock-Out Lounge via its public ICS calendar
 
 ## Architecture
 
@@ -33,6 +35,8 @@ https://USERNAME.github.io/seattle-event-feeds/feeds/neumos.xml
 https://USERNAME.github.io/seattle-event-feeds/feeds/barboza.xml
 https://USERNAME.github.io/seattle-event-feeds/feeds/vera.xml
 https://USERNAME.github.io/seattle-event-feeds/feeds/showbox.xml
+https://USERNAME.github.io/seattle-event-feeds/feeds/tractor.xml
+https://USERNAME.github.io/seattle-event-feeds/feeds/clockout.xml
 ```
 
 ## Failure behavior
@@ -63,3 +67,35 @@ python -m seattle_feeds.main --source neumos --output-dir docs
 ```bash
 python -m unittest discover -s tests -v
 ```
+
+## v5 source notes
+
+### Tractor Tavern
+
+The Tractor site embeds Opendate at `https://app.opendate.io/c/tractor-tavern-13?layout=iframe`.
+The producer follows the public Opendate pagination and emits only cards whose venue is
+`Tractor Tavern`. Tractor-promoted shows at Sunset Tavern, Neumos, Conor Byrne, etc. are
+intentionally excluded from `tractor.xml`. Opendate's numeric event ID is used as the stable
+source ID.
+
+### Clock-Out Lounge
+
+Clock-Out exposes a public Tribe Events ICS feed at:
+
+```text
+https://clockoutlounge.com/?post_type=tribe_events&ical=1&eventDisplay=list
+```
+
+The producer parses `VEVENT` records into the same normalized `seattle:*` RSS schema as the
+other sources. The upstream ICS `UID` is retained as `source_event_id`.
+
+Neither source requires a secret.
+
+## Nectar Lounge / Hidden Hall (v6)
+
+The public Nectar calendar contains events for both Nectar Lounge and Hidden Hall and occasionally promoted events at other venues. The v6 shared connector emits two normalized feeds:
+
+- `feeds/nectar.xml`
+- `feeds/hidden-hall.xml`
+
+Routing uses the actual venue rendered on each calendar card. Tixr's numeric event ID is used as the stable source ID. Events explicitly located at other rooms are excluded from these feeds.

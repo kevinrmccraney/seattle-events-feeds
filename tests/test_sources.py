@@ -4,6 +4,8 @@ from datetime import datetime
 from seattle_feeds.sources.carbonhouse import CarbonhouseSource
 from seattle_feeds.sources.dice import DiceVeraSource
 from seattle_feeds.sources.showbox import ShowboxSource
+from seattle_feeds.sources.tractor import TractorSource
+from seattle_feeds.sources.clockout import ClockOutSource
 from seattle_feeds.util import TZ
 
 
@@ -134,6 +136,100 @@ class ShowboxTests(unittest.TestCase):
         b = ShowboxSource().parse_html(html_b, start)[0]
         self.assertEqual(a.source_event_id, "123456")
         self.assertEqual(a.id, b.id)
+
+
+class TractorTests(unittest.TestCase):
+    def test_parse_listing_filters_other_promoted_venues(self):
+        html = '''
+        <div class="event-card">
+          <img src="https://example.com/tractor.jpg">
+          <a href="/e/jeffrey-martin-w-sam-weber-partially-seated-november-04-2026-761590">Jeffrey Martin w/ Sam Weber (partially seated)</a>
+          <div>with Sam Weber</div>
+          <div>November 04, 2026</div>
+          <div>Doors: 7:00 PM - Show: 8:00 PM</div>
+          <div>Tractor Tavern • Seattle, WA</div>
+        </div>
+        <div class="event-card">
+          <a href="/e/tractor-presents-babehoven-at-the-sunset-november-17-2026-999999">Tractor Presents: Babehoven w/ Pileup AT The Sunset</a>
+          <div>with Pileup</div>
+          <div>November 17, 2026</div>
+          <div>Doors: 7:30 PM - Show: 8:00 PM</div>
+          <div>Sunset Tavern • Seattle, WA</div>
+        </div>
+        <a href="?layout=iframe&page=2">→</a>
+        '''
+        events = TractorSource.parse_listing(html)
+        self.assertEqual(len(events), 1)
+        event = events[0]
+        self.assertEqual(event.id, "tractor:761590")
+        self.assertEqual(event.source_event_id, "761590")
+        self.assertEqual(event.title, "Jeffrey Martin w/ Sam Weber (partially seated)")
+        self.assertEqual(event.support, "Sam Weber")
+        self.assertEqual(event.venue, "Tractor Tavern")
+        self.assertEqual(event.doors_time, "7:00 PM")
+        self.assertEqual(event.start_at.hour, 20)
+        self.assertEqual(event.ticket_url, event.event_url)
+
+    def test_sold_out_and_identity(self):
+        html = '''
+        <div class="event-card">
+          <span>SOLD OUT</span>
+          <a href="https://app.opendate.io/e/test-show-january-29-2027-761641">SOLD OUT! Test Show</a>
+          <div>January 29, 2027</div>
+          <div>Doors: 5:00 PM - Show: 6:00 PM</div>
+          <div>Tractor Tavern • Seattle, WA</div>
+        </div>
+        '''
+        event = TractorSource.parse_listing(html)[0]
+        self.assertTrue(event.sold_out)
+        self.assertEqual(event.source_event_id, "761641")
+
+
+class ClockOutTests(unittest.TestCase):
+    def test_parse_ics_normalizes_event(self):
+        ics = r'''BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VEVENT
+UID:clockout-14376894@example.test
+DTSTART;TZID=America/Los_Angeles:20261112T200000
+DTEND;TZID=America/Los_Angeles:20261112T230000
+SUMMARY:Clock-Out Lounge Presents: TUSH!
+DESCRIPTION:Clock-Out Lounge Presents: TUSH!\\nwith Tush\\n21+\\nDoors 7pm- show at 8pm\\nGA tix $20 adv/$25 dos
+LOCATION:Clock-Out Lounge\\, 4864 Beacon Ave S\\, Seattle\\, WA 98108
+URL:https://www.ticketweb.com/event/clock-out-lounge-presents-tush-clock-out-lounge-tickets/14376894
+STATUS:CONFIRMED
+END:VEVENT
+END:VCALENDAR
+'''
+        events = ClockOutSource.parse_ics(ics)
+        self.assertEqual(len(events), 1)
+        event = events[0]
+        self.assertEqual(event.source_event_id, "clockout-14376894@example.test")
+        self.assertEqual(event.venue, "Clock-Out Lounge")
+        self.assertEqual(event.start_at.hour, 20)
+        self.assertEqual(event.doors_time, "7PM")
+        self.assertEqual(event.age_restriction, "21+")
+        self.assertEqual(event.support, "Tush")
+        self.assertIn("ticketweb.com", event.ticket_url)
+        self.assertEqual(event.metadata["platform"], "tribe_ics")
+
+    def test_parse_ics_folded_and_sold_out(self):
+        ics = r'''BEGIN:VCALENDAR
+BEGIN:VEVENT
+UID:abc123
+DTSTART:20261205T043000Z
+SUMMARY:*SOLD OUT* Clock-Out Lounge Presents: Example Band
+DESCRIPTION:with Support Band\\nDoors: 7:30 pm\\nAll Ages and more text that is
+ continued here
+URL:https://clockoutlounge.com/tm-event/example/
+END:VEVENT
+END:VCALENDAR
+'''
+        event = ClockOutSource.parse_ics(ics)[0]
+        self.assertTrue(event.sold_out)
+        self.assertEqual(event.age_restriction.lower(), "all ages")
+        self.assertEqual(event.doors_time, "7:30 PM")
+        self.assertEqual((event.start_at.month, event.start_at.day, event.start_at.hour), (12, 4, 20))
 
 
 if __name__ == "__main__":
