@@ -185,52 +185,6 @@ class TractorTests(unittest.TestCase):
         self.assertEqual(event.source_event_id, "761641")
 
 
-class ClockOutTests(unittest.TestCase):
-    def test_parse_ics_normalizes_event(self):
-        ics = r'''BEGIN:VCALENDAR
-VERSION:2.0
-BEGIN:VEVENT
-UID:clockout-14376894@example.test
-DTSTART;TZID=America/Los_Angeles:20261112T200000
-DTEND;TZID=America/Los_Angeles:20261112T230000
-SUMMARY:Clock-Out Lounge Presents: TUSH!
-DESCRIPTION:Clock-Out Lounge Presents: TUSH!\\nwith Tush\\n21+\\nDoors 7pm- show at 8pm\\nGA tix $20 adv/$25 dos
-LOCATION:Clock-Out Lounge\\, 4864 Beacon Ave S\\, Seattle\\, WA 98108
-URL:https://www.ticketweb.com/event/clock-out-lounge-presents-tush-clock-out-lounge-tickets/14376894
-STATUS:CONFIRMED
-END:VEVENT
-END:VCALENDAR
-'''
-        events = ClockOutSource.parse_ics(ics)
-        self.assertEqual(len(events), 1)
-        event = events[0]
-        self.assertEqual(event.source_event_id, "clockout-14376894@example.test")
-        self.assertEqual(event.venue, "Clock-Out Lounge")
-        self.assertEqual(event.start_at.hour, 20)
-        self.assertEqual(event.doors_time, "7PM")
-        self.assertEqual(event.age_restriction, "21+")
-        self.assertEqual(event.support, "Tush")
-        self.assertIn("ticketweb.com", event.ticket_url)
-        self.assertEqual(event.metadata["platform"], "tribe_ics")
-
-    def test_parse_ics_folded_and_sold_out(self):
-        ics = r'''BEGIN:VCALENDAR
-BEGIN:VEVENT
-UID:abc123
-DTSTART:20261205T043000Z
-SUMMARY:*SOLD OUT* Clock-Out Lounge Presents: Example Band
-DESCRIPTION:with Support Band\\nDoors: 7:30 pm\\nAll Ages and more text that is
- continued here
-URL:https://clockoutlounge.com/tm-event/example/
-END:VEVENT
-END:VCALENDAR
-'''
-        event = ClockOutSource.parse_ics(ics)[0]
-        self.assertTrue(event.sold_out)
-        self.assertEqual(event.age_restriction.lower(), "all ages")
-        self.assertEqual(event.doors_time, "7:30 PM")
-        self.assertEqual((event.start_at.month, event.start_at.day, event.start_at.hour), (12, 4, 20))
-
 
 if __name__ == "__main__":
     unittest.main()

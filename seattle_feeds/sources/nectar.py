@@ -20,16 +20,16 @@ DATE_RE = re.compile(
 )
 TIME_RE = re.compile(r"\b(\d{1,2}:\d{2}\s*[AP]M)\b", re.I)
 AGE_RE = re.compile(r"\b(All Ages|Ages?\s+\d+\+)", re.I)
-TIXR_EVENT_RE = re.compile(r"tixr\.com/groups/nectarlounge/events/", re.I)
-TIXR_ID_RE = re.compile(r"-(\d+)(?:[/?#].*)?$", re.I)
+TIXR_RE = re.compile(r"https?://(?:www\.)?tixr\.com/", re.I)
+TIXR_ID_RE = re.compile(r"(?:events/[^/?#]*-)?(\d{5,})(?:[/?#].*)?$", re.I)
 
 
 class NectarCalendarSource(EventSource):
     """Shared Nectar Lounge / Hidden Hall calendar parser.
 
-    Nectar publishes both rooms on one calendar. A source instance filters the
-    normalized output to one physical venue so moved/off-site events do not leak
-    into either venue feed.
+    The live Nectar calendar uses its own event-page/title markup while ticket
+    buttons point to Tixr. Parsing therefore starts from candidate event
+    containers and treats the ticket link as metadata, not as the title anchor.
     """
 
     base_url = "https://nectarlounge.com"
@@ -58,33 +58,25 @@ class NectarCalendarSource(EventSource):
     def parse_calendar(self, html: str) -> list[Event]:
         soup = BeautifulSoup(html, "html.parser")
         events: list[Event] = []
-        seen_links: set[str] = set()
+        seen_cards: set[int] = set()
 
+        # Candidate anchors include both event-detail links and Tixr ticket links.
+        # For each candidate, climb to the smallest ancestor that contains one
+        # complete event: date + time + Seattle + an exact venue line.
         for anchor in soup.find_all("a", href=True):
-            href = anchor.get("href", "")
-            absolute = urljoin(self.base_url, href)
-            if not TIXR_EVENT_RE.search(absolute):
-                continue
-
-            title = clean(anchor.get_text(" ", strip=True))
-            if not title or title.upper() in {"TICKETS", "BUY TICKETS", "GET TICKETS"}:
-                continue
-            if absolute in seen_links:
-                continue
-            seen_links.add(absolute)
-
             card = self._find_card(anchor)
             if card is None:
                 continue
-            text = clean(card.get_text(" ", strip=True))
+            ident = id(card)
+            if ident in seen_cards:
+                continue
+            seen_cards.add(ident)
 
-            # The shared calendar occasionally contains promoted events that
-            # have moved to another room (e.g. Neumos). Venue text is the
-            # authoritative routing key.
-            card_lines = [clean(value) for value in card.stripped_strings if clean(value)]
-            if not any(value.lower() == self.venue.lower() for value in card_lines):
+            lines = [clean(v) for v in card.stripped_strings if clean(v)]
+            if not any(v.casefold() == self.venue.casefold() for v in lines):
                 continue
 
+            text = clean(card.get_text(" ", strip=True))
             date_match = DATE_RE.search(text)
             time_match = TIME_RE.search(text)
             if not date_match or not time_match:
@@ -94,11 +86,18 @@ class NectarCalendarSource(EventSource):
             if start_at is None:
                 continue
 
-            id_match = TIXR_ID_RE.search(absolute)
+            title = self._title(card)
+            if not title:
+                continue
+
+            event_url = self._event_url(card)
+            ticket_url = self._ticket_url(card)
+            identity_url = ticket_url or event_url or ""
+            id_match = TIXR_ID_RE.search(identity_url)
             source_event_id = (
                 id_match.group(1)
                 if id_match
-                else stable_source_id(self.key, absolute, title)
+                else stable_source_id(self.key, identity_url, title)
             )
 
             support = self._support(card, title)
@@ -130,8 +129,8 @@ class NectarCalendarSource(EventSource):
                     title=title,
                     venue=self.venue,
                     start_at=start_at.astimezone(TZ),
-                    event_url=absolute,
-                    ticket_url=absolute,
+                    event_url=event_url or ticket_url or self.calendar_url,
+                    ticket_url=ticket_url,
                     image_url=image_url,
                     support=support,
                     promoter=promoter,
@@ -144,30 +143,75 @@ class NectarCalendarSource(EventSource):
 
         return dedupe(events)
 
-    @staticmethod
-    def _find_card(anchor: Tag) -> Tag | None:
+    def _find_card(self, anchor: Tag) -> Tag | None:
         node: Tag | None = anchor
         best: Tag | None = None
-        for _ in range(10):
+        for _ in range(12):
             parent = node.parent if node else None
             if not isinstance(parent, Tag):
                 break
             text = clean(parent.get_text(" ", strip=True))
-            if DATE_RE.search(text) and TIME_RE.search(text) and "Seattle" in text:
+            lines = [clean(v) for v in parent.stripped_strings if clean(v)]
+            has_venue = any(
+                v.casefold() in {"nectar lounge", "hidden hall", "neumos"}
+                for v in lines
+            )
+            if DATE_RE.search(text) and TIME_RE.search(text) and "Seattle" in text and has_venue:
                 best = parent
-                title_links = [
-                    a for a in parent.find_all("a", href=True)
-                    if TIXR_EVENT_RE.search(urljoin("https://nectarlounge.com", a.get("href", "")))
-                    and clean(a.get_text(" ", strip=True)).upper() not in {"TICKETS", "BUY TICKETS", "GET TICKETS"}
-                ]
-                if len(title_links) == 1:
+                # Prefer the smallest complete card; stop before a container
+                # containing multiple distinct dates.
+                if len(DATE_RE.findall(text)) == 1:
                     return parent
             node = parent
         return best
 
     @staticmethod
+    def _title(card: Tag) -> str | None:
+        # Live calendar renders the main title as a heading. Avoid support text.
+        for tag in card.find_all(["h2", "h3", "h4"]):
+            value = clean(tag.get_text(" ", strip=True))
+            if not value:
+                continue
+            lower = value.lower()
+            if lower.startswith("with "):
+                continue
+            if value.upper() in {"TICKETS", "BUY TICKETS", "GET TICKETS"}:
+                continue
+            return value
+
+        # Fallback: first non-ticket link with meaningful text.
+        for a in card.find_all("a", href=True):
+            value = clean(a.get_text(" ", strip=True))
+            if value and value.upper() not in {"TICKETS", "BUY TICKETS", "GET TICKETS"}:
+                return value
+        return None
+
+    @classmethod
+    def _ticket_url(cls, card: Tag) -> str | None:
+        for a in card.find_all("a", href=True):
+            href = urljoin(cls.base_url, a.get("href", ""))
+            label = clean(a.get_text(" ", strip=True)).lower()
+            if TIXR_RE.search(href) or "ticket" in label:
+                return href
+        return None
+
+    @classmethod
+    def _event_url(cls, card: Tag) -> str | None:
+        for a in card.find_all("a", href=True):
+            href = urljoin(cls.base_url, a.get("href", ""))
+            label = clean(a.get_text(" ", strip=True))
+            if not label:
+                continue
+            if TIXR_RE.search(href):
+                continue
+            if "ticket" in label.lower():
+                continue
+            if href.startswith(cls.base_url):
+                return href
+        return None
+
+    @staticmethod
     def _support(card: Tag, title: str) -> str | None:
-        # The calendar renders support as a separate heading beginning "with".
         for tag in card.find_all(["h4", "h5", "p", "div", "span"]):
             value = clean(tag.get_text(" ", strip=True))
             if value.lower().startswith("with ") and value != title:
