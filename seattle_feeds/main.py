@@ -25,6 +25,14 @@ SOURCE_LINKS = {
     "funhouse": "https://www.elcorazonseattle.com/calendar",
     "jazz-alley": "https://www.jazzalley.com/www-home/calendar.jsp",
     "royal-room": "https://theroyalroomseattle.com/events/",
+    "crocodile": "https://calendar.thecrocodile.com/",
+    "sunset-tavern": "https://calendar.thecrocodile.com/",
+    "belltown-yacht-club": "https://calendar.thecrocodile.com/",
+    "baba-yaga": "https://calendar.thecrocodile.com/",
+    "triple-door": "https://tickets.thetripledoor.net/performancelisting.asp?venue=1&venuename=The+Triple+Door",
+    "rabbit-box": "https://tickets.thetripledoor.net/performancelisting.asp?venue=1&venuename=The+Triple+Door",
+    "fremont-abbey": "https://collections.humanitix.com/all-events-fccb3a",
+    "ballard-homestead": "https://collections.humanitix.com/all-events-fccb3a",
 }
 
 

@@ -119,3 +119,19 @@ Royal Room uses its public events listing and excludes explicit maintenance clos
 - El Corazón/Funhouse now use internal `/shows/...` calendar links and parse the enclosing live event card.
 - Jazz Alley associates `shownum` links with nearby run dates and still expands one row per performance.
 - Royal Room parses date/time from the enclosing event listing container, not only the link text.
+
+
+## v8 sources
+
+Adds normalized feeds for:
+
+- `crocodile.xml`
+- `sunset-tavern.xml`
+- `belltown-yacht-club.xml`
+- `baba-yaga.xml`
+- `triple-door.xml`
+- `rabbit-box.xml`
+- `fremont-abbey.xml`
+- `ballard-homestead.xml`
+
+The Crocodile calendar is routed by the actual venue label; existing Hidden Hall and Showbox routes are intentionally not duplicated. Rabbit Box is routed from the Triple Door ticketing listing when the event title explicitly identifies The Rabbit Box. Abbey Arts routes only Fremont Abbey Arts Center and Ballard Homestead from the public Humanitix collection.
