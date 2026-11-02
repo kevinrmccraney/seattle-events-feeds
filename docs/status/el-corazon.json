@@ -1,0 +1,8 @@
+{
+  "source": "el-corazon",
+  "success": false,
+  "generated_at": "2026-11-01T22:12:02.847887-08:00",
+  "code": "source_parse_error",
+  "message": "el-corazon: source returned zero upcoming events",
+  "exception_type": "ValueError"
+}
