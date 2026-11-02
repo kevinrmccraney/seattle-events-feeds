@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import json
 from datetime import datetime, timezone
 from urllib.parse import quote, urljoin, urlparse
 
@@ -85,26 +86,36 @@ class AbbeyArtsSource(EventSource):
             if not HUMANITIX_EVENT_RE.match(href):
                 continue
 
-            block = self._find_host_block(a)
-            if block is None:
+            text = clean(a.get_text(" ", strip=True))
+            if not text:
+                continue
+            lower = text.casefold()
+            if not any(alias in lower for alias in self.aliases):
                 continue
 
-            text = clean(block.get_text(" ", strip=True))
-            haystack = text.casefold()
-            if not any(alias in haystack for alias in self.aliases):
+            date_match = DATE_RE.search(text)
+            if not date_match:
                 continue
-
-            match = DATE_RE.search(text)
-            if not match:
-                continue
-
-            start_at = parse_datetime(match.group(0))
+            start_at = parse_datetime(date_match.group(0))
             if start_at is None:
                 continue
 
-            title = clean(a.get_text(" ", strip=True))
-            if not title:
-                title = self._title(block)
+            # Humanitix card text is:
+            # "DATE, START - END TZ TITLE VENUE..."
+            title = clean(text[date_match.end():])
+            title = re.sub(
+                r"^\s*-\s*\d{1,2}(?::\d{2})?\s*[ap]m\s+(?:PST|PDT|UTC|GMT)\s*",
+                "",
+                title,
+                flags=re.I,
+            )
+            title = re.sub(r"^\s*(?:PST|PDT|UTC|GMT)\s*", "", title, flags=re.I)
+
+            for alias in sorted(self.aliases, key=len, reverse=True):
+                idx = title.casefold().find(alias)
+                if idx >= 0:
+                    title = clean(title[:idx])
+                    break
             if not title:
                 continue
 
@@ -114,7 +125,6 @@ class AbbeyArtsSource(EventSource):
                 continue
             seen.add(source_event_id)
 
-            lower = text.casefold()
             events.append(Event(
                 id=f"{self.key}:{source_event_id}",
                 source=self.key,
@@ -130,7 +140,75 @@ class AbbeyArtsSource(EventSource):
                 metadata={"platform": "humanitix_host"},
             ))
 
+        for script in soup.find_all("script"):
+            raw = script.string or script.get_text("", strip=False)
+            if not raw or ("Fremont Abbey" not in raw and "Ballard Homestead" not in raw):
+                continue
+            try:
+                payload = json.loads(raw)
+            except Exception:
+                continue
+            for obj in self._walk_json(payload):
+                event = self._event_from_json(obj)
+                if event is None or event.source_event_id in seen:
+                    continue
+                seen.add(event.source_event_id)
+                events.append(event)
+
         return dedupe(events)
+
+    @staticmethod
+    def _walk_json(value):
+        if isinstance(value, dict):
+            yield value
+            for child in value.values():
+                yield from AbbeyArtsSource._walk_json(child)
+        elif isinstance(value, list):
+            for child in value:
+                yield from AbbeyArtsSource._walk_json(child)
+
+    def _event_from_json(self, obj: dict) -> Event | None:
+        title = clean(obj.get("title") or obj.get("name") or obj.get("eventName") or obj.get("event_name"))
+        if not title:
+            return None
+        location_value = obj.get("location") or obj.get("venue") or obj.get("address") or ""
+        if isinstance(location_value, dict):
+            location = clean(" ".join(str(v) for v in location_value.values()))
+        else:
+            location = clean(str(location_value))
+        haystack = f"{title} {location}".casefold()
+        if not any(alias in haystack for alias in self.aliases):
+            return None
+
+        start_raw = obj.get("startDate") or obj.get("start_date") or obj.get("start") or obj.get("startTime") or obj.get("start_time")
+        if not start_raw:
+            return None
+        start_at = parse_datetime(str(start_raw))
+        if start_at is None:
+            return None
+
+        url = clean(obj.get("url") or obj.get("eventUrl") or obj.get("event_url") or obj.get("publicUrl") or "")
+        if url and not url.startswith("http"):
+            url = urljoin(HOST_URL, url)
+
+        source_event_id = clean(str(obj.get("id") or obj.get("_id") or obj.get("slug") or ""))
+        if not source_event_id:
+            source_event_id = stable_source_id(self.key, url or HOST_URL, title)
+
+        lower = f"{title} {obj}".casefold()
+        return Event(
+            id=f"{self.key}:{source_event_id}",
+            source=self.key,
+            source_event_id=source_event_id,
+            title=title,
+            venue=self.venue,
+            start_at=start_at.astimezone(TZ),
+            event_url=url or HOST_URL,
+            ticket_url=url or None,
+            status="cancelled" if "cancelled" in lower or "canceled" in lower else "scheduled",
+            sold_out="sold out" in lower,
+            metadata={"platform": "humanitix_host_json", "location": location or None},
+        )
 
     def parse_ics(self, text: str) -> list[Event]:
         events: list[Event] = []

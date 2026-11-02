@@ -27,8 +27,27 @@ class RoyalRoomSource(EventSource):
     calendar_url = "https://theroyalroomseattle.com/events/"
 
     def fetch_events(self, session: Session, start: datetime, end: datetime | None = None) -> list[Event]:
-        response = session.get(self.calendar_url, timeout=30)
-        response.raise_for_status()
+        response = None
+        last_error = None
+        for timeout in (20, 35, 50):
+            try:
+                response = session.get(
+                    self.calendar_url,
+                    timeout=timeout,
+                    headers={
+                        "User-Agent": (
+                            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                            "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0 Safari/537.36"
+                        )
+                    },
+                )
+                response.raise_for_status()
+                break
+            except Exception as exc:
+                last_error = exc
+                response = None
+        if response is None:
+            raise last_error
         events = self.parse_calendar(response.text)
         return dedupe(
             event for event in events
