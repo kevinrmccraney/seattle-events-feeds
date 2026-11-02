@@ -4,13 +4,12 @@ import re
 from datetime import datetime
 from urllib.parse import urljoin, urlparse
 
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 from requests import Session
 
 from .base import EventSource, dedupe
 from ..models import Event
 from ..util import TZ, clean, parse_datetime, stable_source_id
-
 
 DATE_TIME_RE = re.compile(
     r"(?P<date>(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),\s+"
@@ -27,12 +26,7 @@ class RoyalRoomSource(EventSource):
     base_url = "https://theroyalroomseattle.com"
     calendar_url = "https://theroyalroomseattle.com/events/"
 
-    def fetch_events(
-        self,
-        session: Session,
-        start: datetime,
-        end: datetime | None = None,
-    ) -> list[Event]:
+    def fetch_events(self, session: Session, start: datetime, end: datetime | None = None) -> list[Event]:
         response = session.get(self.calendar_url, timeout=30)
         response.raise_for_status()
         events = self.parse_calendar(response.text)
@@ -49,9 +43,11 @@ class RoyalRoomSource(EventSource):
 
         for a in soup.find_all("a", href=True):
             href = urljoin(cls.base_url, a.get("href", ""))
-            if "/event/" not in href:
+            if "/event/" not in urlparse(href).path:
                 continue
-            text = clean(a.get_text(" ", strip=True))
+
+            container = cls._find_container(a)
+            text = clean((container or a).get_text(" ", strip=True))
             if not text or "CLOSED FOR MAINTENANCE" in text.upper():
                 continue
 
@@ -63,10 +59,10 @@ class RoyalRoomSource(EventSource):
             if start_at is None:
                 continue
 
-            # Strip compact date prefix and the full datetime suffix.
-            title = re.sub(r"^\d{1,2}\s+[A-Z][a-z]{2}\s+", "", text)
-            title = DATE_TIME_RE.sub("", title)
-            title = title.rstrip(" -").strip()
+            title = cls._extract_title(text, match)
+            if not title:
+                title = clean(a.get_text(" ", strip=True))
+                title = DATE_TIME_RE.sub("", title).strip(" -")
             if not title:
                 continue
 
@@ -89,4 +85,28 @@ class RoyalRoomSource(EventSource):
                 sold_out="sold out" in text.lower(),
                 metadata={"platform": "wordpress_events"},
             ))
+
         return dedupe(events)
+
+    @classmethod
+    def _find_container(cls, anchor: Tag) -> Tag | None:
+        node: Tag | None = anchor
+        best: Tag | None = None
+        for _ in range(8):
+            parent = node.parent if node else None
+            if not isinstance(parent, Tag):
+                break
+            text = clean(parent.get_text(" ", strip=True))
+            if DATE_TIME_RE.search(text):
+                best = parent
+                event_links = [x for x in parent.find_all("a", href=True) if "/event/" in urlparse(urljoin(cls.base_url, x.get("href", ""))).path]
+                if len(event_links) == 1:
+                    return parent
+            node = parent
+        return best
+
+    @staticmethod
+    def _extract_title(text: str, match: re.Match) -> str:
+        before = text[:match.start()].strip()
+        before = re.sub(r"^\d{1,2}\s+[A-Z][a-z]{2}\s+", "", before)
+        return clean(before).strip(" -")

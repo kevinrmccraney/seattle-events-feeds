@@ -21,6 +21,10 @@ SOURCE_LINKS = {
     "clockout": "https://clockoutlounge.com/",
     "nectar": "https://nectarlounge.com/events/calendar/",
     "hidden-hall": "https://nectarlounge.com/events/calendar/",
+    "el-corazon": "https://www.elcorazonseattle.com/calendar",
+    "funhouse": "https://www.elcorazonseattle.com/calendar",
+    "jazz-alley": "https://www.jazzalley.com/www-home/calendar.jsp",
+    "royal-room": "https://theroyalroomseattle.com/events/",
 }
 
 

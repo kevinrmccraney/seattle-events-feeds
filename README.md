@@ -113,3 +113,9 @@ Adds normalized feeds for:
 El Corazón/Funhouse share the venue calendar but are routed by physical venue.
 Jazz Alley is modeled as one normalized event per individual performance. The underlying `shownum` is combined with the specific performance datetime for stable identity.
 Royal Room uses its public events listing and excludes explicit maintenance closures.
+
+## v7.3 live connector fixes
+
+- El Corazón/Funhouse now use internal `/shows/...` calendar links and parse the enclosing live event card.
+- Jazz Alley associates `shownum` links with nearby run dates and still expands one row per performance.
+- Royal Room parses date/time from the enclosing event listing container, not only the link text.

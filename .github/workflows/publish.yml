@@ -1,5 +1,8 @@
 name: Refresh normalized RSS feeds
 on:
+  push:
+    branches:
+      - main
   workflow_dispatch:
   schedule:
     - cron: '17 13 * * 1'
