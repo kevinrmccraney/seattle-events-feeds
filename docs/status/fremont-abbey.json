@@ -1,0 +1,8 @@
+{
+  "source": "fremont-abbey",
+  "success": false,
+  "generated_at": "2026-11-01T22:37:57.417290-08:00",
+  "code": "source_http_error",
+  "message": "403 Client Error: Forbidden for url: https://collections.humanitix.com/all-events-fccb3a",
+  "exception_type": "HTTPError"
+}
