@@ -1,27 +1,39 @@
 import unittest
 from seattle_feeds.sources.abbeyarts import FremontAbbeySource, BallardHomesteadSource
 
-FIXTURE='''
-<div>
-<a href="https://events.humanitix.com/26-11-5-moth">Thu, Nov 5, 8pm - 10:30pm PST 11/5 The Moth StorySLAM @ FREMONT ABBEY Seattle Fremont Abbey Arts Center, Seattle WA, United States</a>
-<a href="https://events.humanitix.com/26-11-7-suitcasejunket">Sat, Nov 7, 7:30pm - 10pm PST The Suitcase Junket, Erika Lundahl @ BALLARD HOMESTEAD Ballard Homestead, Seattle WA, United States</a>
-<a href="https://events.humanitix.com/26-11-13-elanor">Fri, Nov 13, 7:30pm - 10pm PST CANCELLED: Elanor Moss @ BALLARD HOMESTEAD Ballard Homestead, Seattle WA, United States</a>
-</div>
+ICS = r'''BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VEVENT
+UID:abc-fremont
+DTSTART;TZID=America/Los_Angeles:20261112T193000
+DTEND;TZID=America/Los_Angeles:20261112T220000
+SUMMARY:The Round at Fremont Abbey
+LOCATION:Fremont Abbey Arts Center\, 4272 Fremont Ave N\, Seattle
+DESCRIPTION:All Ages\nTickets: https://events.humanitix.com/the-round-example
+STATUS:CONFIRMED
+END:VEVENT
+BEGIN:VEVENT
+UID:abc-ballard
+DTSTART;TZID=America/Los_Angeles:20261126T193000
+SUMMARY:Bryan John Appleby
+LOCATION:Ballard Homestead\, Seattle\, WA
+DESCRIPTION:All Ages\nhttps://events.humanitix.com/bryan-john-appleby
+END:VEVENT
+END:VCALENDAR
 '''
 
 class AbbeyArtsTests(unittest.TestCase):
     def test_fremont(self):
-        events=FremontAbbeySource().parse_collection(FIXTURE,default_year=2026)
-        self.assertEqual(len(events),1)
-        self.assertIn('Moth StorySLAM',events[0].title)
-        self.assertEqual(events[0].start_at.hour,20)
+        events = FremontAbbeySource().parse_ics(ICS)
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0].source_event_id, 'abc-fremont')
+        self.assertEqual(events[0].venue, 'Fremont Abbey Arts Center')
 
-    def test_ballard_and_cancelled(self):
-        events=BallardHomesteadSource().parse_collection(FIXTURE,default_year=2026)
-        self.assertEqual(len(events),2)
-        cancelled=[e for e in events if e.status=='cancelled']
-        self.assertEqual(len(cancelled),1)
-        self.assertEqual(cancelled[0].source_event_id,'26-11-13-elanor')
+    def test_ballard(self):
+        events = BallardHomesteadSource().parse_ics(ICS)
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0].source_event_id, 'abc-ballard')
+        self.assertEqual(events[0].venue, 'Ballard Homestead')
 
 if __name__ == '__main__':
     unittest.main()

@@ -1,10 +1,10 @@
-from .crocodile import CrocodileSource, SunsetTavernSource, BelltownYachtClubSource, BabaYagaSource
-from .tripledoor import TripleDoorSource, RabbitBoxSource
+from .crocodile import CrocodileSource, SunsetTavernSource, BelltownYachtClubSource, BabaYagaSource, ShowboxCrocodileSource
+from .tripledoor import TripleDoorSource
+from .rabbitbox import RabbitBoxSource
 from .abbeyarts import FremontAbbeySource, BallardHomesteadSource
 from .carbonhouse import CarbonhouseSource
 from .clockout import ClockOutSource
 from .dice import DiceVeraSource
-from .showbox import ShowboxSource
 from .tractor import TractorSource
 from .nectar import NectarSource, HiddenHallSource
 from .royalroom import RoyalRoomSource
@@ -15,7 +15,7 @@ SOURCES = [
     CarbonhouseSource("neumos", "Neumos", "https://www.neumos.com", "Neumos"),
     CarbonhouseSource("barboza", "Barboza", "https://www.thebarboza.com", "Barboza"),
     DiceVeraSource(),
-    ShowboxSource(),
+    ShowboxCrocodileSource(),
     TractorSource(),
     ClockOutSource(),
     NectarSource(),

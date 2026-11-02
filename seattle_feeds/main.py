@@ -16,7 +16,7 @@ SOURCE_LINKS = {
     "neumos": "https://www.neumos.com/events",
     "barboza": "https://www.thebarboza.com/events",
     "vera": "https://theveraproject.org/events/",
-    "showbox": "https://www.showboxpresents.com/events/all",
+    "showbox": "https://calendar.thecrocodile.com/",
     "tractor": "https://tractortavern.com/calendar/",
     "clockout": "https://clockoutlounge.com/",
     "nectar": "https://nectarlounge.com/events/calendar/",
@@ -29,10 +29,10 @@ SOURCE_LINKS = {
     "sunset-tavern": "https://calendar.thecrocodile.com/",
     "belltown-yacht-club": "https://calendar.thecrocodile.com/",
     "baba-yaga": "https://calendar.thecrocodile.com/",
-    "triple-door": "https://tickets.thetripledoor.net/performancelisting.asp?venue=1&venuename=The+Triple+Door",
-    "rabbit-box": "https://tickets.thetripledoor.net/performancelisting.asp?venue=1&venuename=The+Triple+Door",
-    "fremont-abbey": "https://collections.humanitix.com/all-events-fccb3a",
-    "ballard-homestead": "https://collections.humanitix.com/all-events-fccb3a",
+    "triple-door": "https://www.thetripledoor.net/mainstage-calendar",
+    "rabbit-box": "https://www.therabbitboxseattle.com/events",
+    "fremont-abbey": "https://www.fremontabbey.org/calendar/",
+    "ballard-homestead": "https://www.fremontabbey.org/calendar/",
 }
 
 

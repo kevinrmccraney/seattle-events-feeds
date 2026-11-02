@@ -25,10 +25,11 @@ FULL_DATE_RE = re.compile(
 class CrocodileCalendarSource(EventSource):
     base_url = "https://calendar.thecrocodile.com/"
 
-    def __init__(self, key: str, name: str, venue: str):
+    def __init__(self, key: str, name: str, venue: str, aliases: tuple[str, ...] | None = None):
         self.key = key
         self.name = name
         self.venue = venue
+        self.aliases = aliases or (venue,)
 
     def fetch_events(self, session: Session, start: datetime, end: datetime | None = None) -> list[Event]:
         response = session.get(self.base_url, timeout=30)
@@ -46,13 +47,16 @@ class CrocodileCalendarSource(EventSource):
         # user-visible representation rather than depending on Webflow classes.
         for anchor in soup.find_all("a", href=True):
             text = clean(anchor.get_text(" ", strip=True))
-            if not text or self.venue.casefold() not in text.casefold():
+            if not text:
+                continue
+            matched_venue = next((v for v in self.aliases if v.casefold() in text.casefold()), None)
+            if not matched_venue:
                 continue
             match = DATE_TIME_RE.search(text)
             if not match:
                 continue
 
-            venue_pos = text.casefold().find(self.venue.casefold(), match.end())
+            venue_pos = text.casefold().find(matched_venue.casefold(), match.end())
             if venue_pos < 0:
                 continue
 
@@ -83,7 +87,7 @@ class CrocodileCalendarSource(EventSource):
                 source=self.key,
                 source_event_id=source_event_id,
                 title=title,
-                venue=self.venue,
+                venue=matched_venue,
                 start_at=start_at.astimezone(TZ),
                 event_url=href or self.base_url,
                 ticket_url=ticket_url or href or None,
@@ -131,3 +135,12 @@ def BelltownYachtClubSource() -> CrocodileCalendarSource:
 
 def BabaYagaSource() -> CrocodileCalendarSource:
     return CrocodileCalendarSource("baba-yaga", "Baba Yaga", "Baba Yaga")
+
+
+def ShowboxCrocodileSource() -> CrocodileCalendarSource:
+    return CrocodileCalendarSource(
+        "showbox",
+        "The Showbox / Showbox SoDo",
+        "The Showbox",
+        aliases=("The Showbox", "Showbox SoDo"),
+    )

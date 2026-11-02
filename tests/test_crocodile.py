@@ -1,5 +1,5 @@
 import unittest
-from seattle_feeds.sources.crocodile import CrocodileSource, SunsetTavernSource, BelltownYachtClubSource, BabaYagaSource
+from seattle_feeds.sources.crocodile import CrocodileSource, SunsetTavernSource, BelltownYachtClubSource, BabaYagaSource, ShowboxCrocodileSource
 
 FIXTURE = '''
 <div class="card">
@@ -12,6 +12,7 @@ FIXTURE = '''
 </div>
 <div class="card"><a href="/event/jack">JACK BENSINGER Nov 21, 2026 7:30 PM Belltown Yacht Club Buy Tickets</a></div>
 <div class="card"><a href="/event/denise">DENISE JULIA Nov 16, 2026 8:00 PM Baba Yaga Buy Tickets</a></div>
+<div class="card"><a href="/event/showbox">SLOTHRUST Nov 1, 2026 8:00 PM The Showbox Buy Tickets</a></div>
 <div class="card"><a href="/event/hidden">STOP LIGHT OBSERVATIONS Nov 5, 2026 8:00 PM Hidden Hall Buy Tickets</a></div>
 '''
 
@@ -27,6 +28,7 @@ class CrocodileTests(unittest.TestCase):
         self.assertEqual(len(SunsetTavernSource().parse_calendar(FIXTURE)),1)
         self.assertEqual(len(BelltownYachtClubSource().parse_calendar(FIXTURE)),1)
         self.assertEqual(len(BabaYagaSource().parse_calendar(FIXTURE)),1)
+        self.assertEqual(len(ShowboxCrocodileSource().parse_calendar(FIXTURE)),1)
 
 if __name__ == '__main__':
     unittest.main()

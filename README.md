@@ -135,3 +135,13 @@ Adds normalized feeds for:
 - `ballard-homestead.xml`
 
 The Crocodile calendar is routed by the actual venue label; existing Hidden Hall and Showbox routes are intentionally not duplicated. Rabbit Box is routed from the Triple Door ticketing listing when the event title explicitly identifies The Rabbit Box. Abbey Arts routes only Fremont Abbey Arts Center and Ballard Homestead from the public Humanitix collection.
+
+
+## v8.1 source fixes
+
+- Triple Door: first-party mainstage calendar (`occurrence_id` per performance).
+- Rabbit Box: first-party Rabbit Box events page.
+- Fremont Abbey / Ballard Homestead: public Abbey Arts Google Calendar ICS feeds instead of the blocked Humanitix collection page.
+- Showbox: Crocodile centralized calendar route for The Showbox / Showbox SoDo.
+
+Feed names and importer registry paths are unchanged.
