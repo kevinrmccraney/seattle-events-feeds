@@ -10,6 +10,7 @@ from .nectar import NectarSource, HiddenHallSource
 from .royalroom import RoyalRoomSource
 from .jazzalley import JazzAlleySource
 from .elcorazon import ElCorazonSource, FunhouseSource
+from .stg import ParamountSource, NeptuneSource, MooreSource
 
 SOURCES = [
     CarbonhouseSource("neumos", "Neumos", "https://www.neumos.com", "Neumos"),
@@ -32,4 +33,7 @@ SOURCES = [
     RabbitBoxSource(),
     FremontAbbeySource(),
     BallardHomesteadSource(),
+    ParamountSource(),
+    NeptuneSource(),
+    MooreSource(),
 ]
