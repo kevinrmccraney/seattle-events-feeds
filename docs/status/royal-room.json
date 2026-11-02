@@ -1,7 +1,8 @@
 {
   "source": "royal-room",
-  "success": true,
-  "generated_at": "2026-11-01T23:09:12.296488-08:00",
-  "event_count": 8,
-  "feed": "feeds/royal-room.xml"
+  "success": false,
+  "generated_at": "2026-11-01T23:16:39.965392-08:00",
+  "code": "source_timeout",
+  "message": "HTTPSConnectionPool(host='theroyalroomseattle.com', port=443): Max retries exceeded with url: /events/ (Caused by ConnectTimeoutError(<HTTPSConnection(host='theroyalroomseattle.com', port=443) at 0x7f2995e71d90>, 'Connection to theroyalroomseattle.com timed out. (connect timeout=30)'))",
+  "exception_type": "ConnectTimeout"
 }
