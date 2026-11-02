@@ -1,7 +1,7 @@
 {
   "source": "showbox",
   "success": false,
-  "generated_at": "2026-11-01T17:18:25.413640-08:00",
+  "generated_at": "2026-11-01T21:56:54.007300-08:00",
   "code": "source_parse_error",
   "message": "showbox: source returned zero upcoming events",
   "exception_type": "ValueError"
