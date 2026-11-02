@@ -20,6 +20,16 @@ CALENDAR_IDS = (
 HOST_URL = "https://events.humanitix.com/host/abbey-arts-presents"
 
 HUMANITIX_EVENT_RE = re.compile(r"^https?://events\.humanitix\.com/(?!host/)[^?#]+", re.I)
+TEXT_EVENT_RE = re.compile(
+    r"(?P<date>(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun),\s+"
+    r"(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+"
+    r"\d{1,2},\s+\d{1,2}(?::\d{2})?\s*[ap]m)"
+    r"(?:\s*-\s*\d{1,2}(?::\d{2})?\s*[ap]m\s+(?:PST|PDT))?\s+"
+    r"(?P<title>.+?)\s+"
+    r"(?P<venue>Fremont Abbey Arts Center|Ballard Homestead),\s+Seattle WA,\s+United States",
+    re.I,
+)
+
 DATE_RE = re.compile(
     r"\b(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun),\s+"
     r"(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+"
@@ -154,6 +164,52 @@ class AbbeyArtsSource(EventSource):
                     continue
                 seen.add(event.source_event_id)
                 events.append(event)
+
+        # Fallback for Humanitix bot/SSR variants that expose the full
+        # inventory as page text but not as individual event anchors.
+        page_text = clean(soup.get_text(" ", strip=True))
+        for match in TEXT_EVENT_RE.finditer(page_text):
+            venue_text = clean(match.group("venue"))
+            haystack = venue_text.casefold()
+            if not any(alias in haystack for alias in self.aliases):
+                continue
+
+            start_at = parse_datetime(match.group("date"))
+            if start_at is None:
+                continue
+
+            title = clean(match.group("title"))
+            # Trim any previous event tail that leaked into this lazy-rendered text.
+            last_marker = max(
+                title.casefold().rfind("united states "),
+                title.casefold().rfind("past "),
+                title.casefold().rfind("upcoming "),
+            )
+            if last_marker >= 0:
+                title = clean(title[last_marker:].split(" ", 1)[-1])
+            if not title:
+                continue
+
+            base_id = stable_source_id(self.key, HOST_URL, title)
+            source_event_id = f"{base_id}:{start_at.strftime('%Y%m%dT%H%M')}"
+            if source_event_id in seen:
+                continue
+            seen.add(source_event_id)
+
+            lower = title.casefold()
+            events.append(Event(
+                id=f"{self.key}:{source_event_id}",
+                source=self.key,
+                source_event_id=source_event_id,
+                title=title,
+                venue=self.venue,
+                start_at=start_at.astimezone(TZ),
+                event_url=HOST_URL,
+                ticket_url=None,
+                status="cancelled" if "cancelled" in lower or "canceled" in lower else "scheduled",
+                sold_out="sold out" in lower,
+                metadata={"platform": "humanitix_host_text_fallback"},
+            ))
 
         return dedupe(events)
 
