@@ -1,7 +1,7 @@
 {
   "source": "chop-suey",
   "success": false,
-  "generated_at": "2026-11-02T10:25:38.097756-08:00",
+  "generated_at": "2026-11-02T14:18:10.244038-08:00",
   "code": "source_http_error",
   "message": "530 Server Error: Unknown Error for url: https://www.ticketweb.com/venue/chop-suey-seattle-wa/19270",
   "exception_type": "HTTPError"

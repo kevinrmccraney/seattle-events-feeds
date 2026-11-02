@@ -1,7 +1,7 @@
 {
   "source": "fremont-abbey",
   "success": false,
-  "generated_at": "2026-11-02T10:25:38.097756-08:00",
+  "generated_at": "2026-11-02T14:18:10.244038-08:00",
   "code": "inventory_below_expected",
   "message": "fremont-abbey: inventory below expected minimum (4 < 5); preserving last good feed",
   "exception_type": "InventoryBelowExpected"
