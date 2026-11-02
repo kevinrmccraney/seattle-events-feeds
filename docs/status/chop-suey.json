@@ -1,0 +1,8 @@
+{
+  "source": "chop-suey",
+  "success": false,
+  "generated_at": "2026-11-02T08:51:37.970386-08:00",
+  "code": "source_http_error",
+  "message": "403 Client Error: Forbidden for url: https://chopsuey.com/",
+  "exception_type": "HTTPError"
+}

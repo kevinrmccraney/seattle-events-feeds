@@ -1,0 +1,8 @@
+{
+  "source": "substation",
+  "success": false,
+  "generated_at": "2026-11-02T08:51:37.970386-08:00",
+  "code": "source_parse_error",
+  "message": "substation: source returned zero upcoming events",
+  "exception_type": "ValueError"
+}

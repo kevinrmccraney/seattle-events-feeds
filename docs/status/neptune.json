@@ -1,7 +1,8 @@
 {
   "source": "neptune",
-  "success": true,
-  "generated_at": "2026-11-01T23:43:55.266024-08:00",
-  "event_count": 12,
-  "feed": "feeds/neptune.xml"
+  "success": false,
+  "generated_at": "2026-11-02T08:51:37.970386-08:00",
+  "code": "source_parse_error",
+  "message": "neptune: source returned zero upcoming events",
+  "exception_type": "ValueError"
 }
