@@ -1,8 +1,7 @@
 {
   "source": "rabbit-box",
-  "success": false,
-  "generated_at": "2026-11-01T23:16:39.965392-08:00",
-  "code": "source_parse_error",
-  "message": "rabbit-box: source returned zero upcoming events",
-  "exception_type": "ValueError"
+  "success": true,
+  "generated_at": "2026-11-01T23:22:29.574340-08:00",
+  "event_count": 34,
+  "feed": "feeds/rabbit-box.xml"
 }
