@@ -1,7 +1,7 @@
 {
   "source": "triple-door",
   "success": false,
-  "generated_at": "2026-11-01T22:37:57.417290-08:00",
+  "generated_at": "2026-11-01T22:44:47.925012-08:00",
   "code": "source_parse_error",
   "message": "triple-door: source returned zero upcoming events",
   "exception_type": "ValueError"
