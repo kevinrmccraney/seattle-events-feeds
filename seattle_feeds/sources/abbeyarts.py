@@ -183,7 +183,7 @@ def FremontAbbeySource() -> AbbeyArtsCalendarSource:
         "fremont-abbey",
         "Fremont Abbey Arts Center",
         "Fremont Abbey Arts Center",
-        ("Fremont Abbey", "Fremont Abbey Arts Center"),
+        ("Fremont Abbey", "Fremont Abbey Arts Center", "4272 Fremont Ave", "4272 Fremont Avenue"),
     )
 
 
@@ -192,5 +192,5 @@ def BallardHomesteadSource() -> AbbeyArtsCalendarSource:
         "ballard-homestead",
         "Ballard Homestead",
         "Ballard Homestead",
-        ("Ballard Homestead",),
+        ("Ballard Homestead", "6541 Jones Ave", "6541 Jones Avenue"),
     )
