@@ -4,19 +4,21 @@ import re
 from datetime import datetime
 from urllib.parse import urljoin, urlparse, parse_qs
 
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 from requests import Session
 
 from .base import EventSource, dedupe
 from ..models import Event
-from ..util import TZ, clean, parse_datetime
+from ..util import TZ, clean, parse_datetime, stable_source_id
 
-DATE_RE = re.compile(
+
+FULL_DATE_RE = re.compile(
     r"\b(?P<date>(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),\s+"
     r"(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+"
     r"\d{1,2}(?:,\s+\d{4})?)\s*@\s*(?P<time>\d{1,2}:\d{2}\s*[AP]M)\b",
     re.I,
 )
+OCCURRENCE_RE = re.compile(r"[?&]occurrence_id=(\d+)")
 
 
 class TripleDoorSource(EventSource):
@@ -25,43 +27,55 @@ class TripleDoorSource(EventSource):
     venue = "The Triple Door"
     base_url = "https://www.thetripledoor.net"
     listing_url = "https://www.thetripledoor.net/mainstage-calendar"
+    max_pages = 60
 
-    def fetch_events(self, session: Session, start: datetime, end: datetime | None = None) -> list[Event]:
-        response = session.get(self.listing_url, timeout=30)
-        response.raise_for_status()
-
-        links = self.extract_performance_links(response.text)
+    def fetch_events(
+        self,
+        session: Session,
+        start: datetime,
+        end: datetime | None = None,
+    ) -> list[Event]:
+        # The month grid only shows day numbers. The same page also contains a
+        # paginated detail list with full dates. Crawl that detail pagination.
+        url = self.listing_url
+        seen_urls: set[str] = set()
         events: list[Event] = []
-        fallback_by_id = {e.source_event_id: e for e in self.parse_listing(response.text, default_year=start.year)}
 
-        for href, occurrence_id in links:
-            try:
-                detail = session.get(href, timeout=30)
-                detail.raise_for_status()
-            except Exception:
-                event = fallback_by_id.get(occurrence_id)
-                if event is not None and event.start_at >= start and (end is None or event.start_at <= end):
-                    events.append(event)
-                continue
+        browser_headers = {
+            "User-Agent": (
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/141.0 Safari/537.36"
+            )
+        }
 
-            event = self.parse_detail(detail.text, href, occurrence_id, default_year=start.year)
-            if event is None:
-                continue
-            if event.start_at < start or (end is not None and event.start_at > end):
-                continue
-            events.append(event)
+        for _ in range(self.max_pages):
+            if url in seen_urls:
+                break
+            seen_urls.add(url)
 
-        return dedupe(events)
+            response = session.get(url, timeout=30, headers=browser_headers)
+            response.raise_for_status()
 
+            page_events = self.parse_detail_list(response.text, default_year=start.year)
+            events.extend(page_events)
+
+            next_url = self.next_page_url(response.text)
+            if not next_url:
+                break
+            url = next_url
+
+        return dedupe(
+            e for e in events
+            if e.start_at >= start and (end is None or e.start_at <= end)
+        )
 
     @classmethod
-    def parse_listing(cls, html: str, default_year: int | None = None) -> list[Event]:
-        """Fallback parser for the calendar HTML itself.
-
-        Live fetching now prefers first-party detail pages, but this parser keeps
-        the calendar usable if the detail request fails and preserves regression
-        coverage for the current compact card structure.
-        """
+    def parse_detail_list(
+        cls,
+        html: str,
+        default_year: int | None = None,
+    ) -> list[Event]:
         soup = BeautifulSoup(html, "html.parser")
         events: list[Event] = []
         seen: set[str] = set()
@@ -70,21 +84,26 @@ class TripleDoorSource(EventSource):
             href = urljoin(cls.base_url, a.get("href", ""))
             if "/go/events/" not in href:
                 continue
-            qs = parse_qs(urlparse(href).query)
-            occurrence_id = (qs.get("occurrence_id") or [""])[0]
-            if not occurrence_id or occurrence_id in seen:
+
+            title = clean(a.get_text(" ", strip=True))
+            if not title or title.casefold().startswith("closed for"):
                 continue
 
-            node = a.parent
-            card = node if node is not None else a
-            text = clean(card.get_text(" ", strip=True))
+            block = cls._find_detail_block(a)
+            if block is None:
+                continue
+
+            text = clean(block.get_text(" ", strip=True))
             lower = text.casefold()
-            if "the rabbit box" in lower or "mainstage theatre" not in lower:
+            if "the rabbit box" in lower:
+                continue
+            if "mainstage theatre" not in lower:
                 continue
 
-            match = DATE_RE.search(text)
+            match = FULL_DATE_RE.search(text)
             if not match:
                 continue
+
             date_text = match.group("date")
             if not re.search(r"\b20\d{2}\b", date_text):
                 date_text = f"{date_text}, {default_year or datetime.now(TZ).year}"
@@ -92,114 +111,65 @@ class TripleDoorSource(EventSource):
             if start_at is None:
                 continue
 
-            title = clean(a.get_text(" ", strip=True))
-            if not title or title.casefold().startswith("closed for"):
+            occurrence_match = OCCURRENCE_RE.search(href)
+            source_event_id = (
+                occurrence_match.group(1)
+                if occurrence_match
+                else stable_source_id(cls.key, href, title)
+            )
+            if source_event_id in seen:
                 continue
+            seen.add(source_event_id)
 
-            seen.add(occurrence_id)
+            ticket_url = None
+            for link in block.find_all("a", href=True):
+                candidate = urljoin(cls.base_url, link.get("href", ""))
+                label = clean(link.get_text(" ", strip=True)).casefold()
+                if "get tickets" in label or "tickets.thetripledoor.net" in candidate:
+                    ticket_url = candidate
+                    break
+
             events.append(Event(
-                id=f"{cls.key}:{occurrence_id}",
+                id=f"{cls.key}:{source_event_id}",
                 source=cls.key,
-                source_event_id=occurrence_id,
+                source_event_id=source_event_id,
                 title=title,
                 venue=cls.venue,
                 start_at=start_at.astimezone(TZ),
                 event_url=href,
-                ticket_url=href,
+                ticket_url=ticket_url or href,
                 status="cancelled" if "cancelled" in lower or "canceled" in lower else "scheduled",
                 sold_out="sold out" in lower,
-                metadata={"platform": "zoogle_calendar", "occurrence_id": occurrence_id},
+                metadata={"platform": "zoogle_calendar"},
             ))
 
         return dedupe(events)
 
     @classmethod
-    def extract_performance_links(cls, html: str) -> list[tuple[str, str]]:
+    def next_page_url(cls, html: str) -> str | None:
         soup = BeautifulSoup(html, "html.parser")
-        found: list[tuple[str, str]] = []
-        seen: set[str] = set()
-
-        for a in soup.find_all("a", href=True):
-            href = urljoin(cls.base_url, a.get("href", ""))
-            if "/go/events/" not in href:
-                continue
-            qs = parse_qs(urlparse(href).query)
-            occurrence_id = (qs.get("occurrence_id") or [""])[0]
-            if not occurrence_id or occurrence_id in seen:
-                continue
-            seen.add(occurrence_id)
-            found.append((href, occurrence_id))
-
-        return found
-
-    @classmethod
-    def parse_detail(
-        cls,
-        html: str,
-        event_url: str,
-        occurrence_id: str,
-        default_year: int | None = None,
-    ) -> Event | None:
-        soup = BeautifulSoup(html, "html.parser")
-        text = clean(soup.get_text(" ", strip=True))
-        lower = text.casefold()
-
-        # Rabbit Box performances appear on the Triple Door calendar but belong
-        # in the Rabbit Box feed.
-        if "the rabbit box" in lower:
-            return None
-        if "mainstage theatre" not in lower:
-            return None
-
-        match = DATE_RE.search(text)
-        if not match:
-            return None
-
-        date_text = match.group("date")
-        if not re.search(r"\b20\d{2}\b", date_text):
-            date_text = f"{date_text}, {default_year or datetime.now(TZ).year}"
-        start_at = parse_datetime(f"{date_text} {match.group('time')}")
-        if start_at is None:
-            return None
-
-        title = cls._title(soup)
-        if not title or title.casefold().startswith("closed for"):
-            return None
-
-        ticket_url = None
         for a in soup.find_all("a", href=True):
             label = clean(a.get_text(" ", strip=True)).casefold()
-            href = urljoin(cls.base_url, a.get("href", ""))
-            if "get tickets" in label or "tickets.thetripledoor.net" in href:
-                ticket_url = href
-                break
-
-        return Event(
-            id=f"{cls.key}:{occurrence_id}",
-            source=cls.key,
-            source_event_id=occurrence_id,
-            title=title,
-            venue=cls.venue,
-            start_at=start_at.astimezone(TZ),
-            event_url=event_url,
-            ticket_url=ticket_url or event_url,
-            status="cancelled" if "cancelled" in lower or "canceled" in lower else "scheduled",
-            sold_out="sold out" in lower,
-            metadata={"platform": "zoogle_calendar", "occurrence_id": occurrence_id},
-        )
+            if label == "next":
+                return urljoin(cls.base_url, a.get("href", ""))
+        return None
 
     @staticmethod
-    def _title(soup: BeautifulSoup) -> str | None:
-        generic = {
-            "upcoming mainstage shows",
-            "the triple door",
-            "mainstage calendar",
-        }
-        for tag in soup.find_all(["h1", "h2", "h3"]):
-            value = clean(tag.get_text(" ", strip=True))
-            if not value:
-                continue
-            if value.casefold() in generic:
-                continue
-            return value
-        return None
+    def _find_detail_block(anchor: Tag) -> Tag | None:
+        node: Tag | None = anchor
+        best: Tag | None = None
+        for _ in range(12):
+            parent = node.parent if node else None
+            if not isinstance(parent, Tag):
+                break
+            text = clean(parent.get_text(" ", strip=True))
+            if FULL_DATE_RE.search(text):
+                best = parent
+                links = [
+                    x for x in parent.find_all("a", href=True)
+                    if "/go/events/" in x.get("href", "")
+                ]
+                if len(links) <= 1:
+                    return parent
+            node = parent
+        return best
