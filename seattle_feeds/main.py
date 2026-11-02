@@ -33,9 +33,12 @@ SOURCE_LINKS = {
     "rabbit-box": "https://www.therabbitboxseattle.com/events",
     "fremont-abbey": "https://www.fremontabbey.org/calendar/",
     "ballard-homestead": "https://www.fremontabbey.org/calendar/",
-    "paramount": "https://www.stgpresents.org/stg-venues/paramount-theatre/events/",
-    "neptune": "https://www.stgpresents.org/stg-venues/neptune-theatre/events/",
-    "moore": "https://www.stgpresents.org/stg-venues/moore-theatre/events/",
+    "paramount": "https://www.stgpresents.org/event-category/paramount/",
+    "neptune": "https://www.stgpresents.org/event-category/neptune/",
+    "moore": "https://www.stgpresents.org/event-category/moore/",
+    "chop-suey": "https://chopsuey.com/",
+    "substation": "https://substationseattle.com/",
+    "central-saloon": "https://centralsaloon.com/events/",
 }
 
 

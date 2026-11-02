@@ -1,3 +1,6 @@
+from .centralsaloon import CentralSaloonSource
+from .substation import SubstationSource
+from .chopsuey import ChopSueySource
 from .crocodile import CrocodileSource, SunsetTavernSource, BelltownYachtClubSource, BabaYagaSource, ShowboxCrocodileSource
 from .tripledoor import TripleDoorSource
 from .rabbitbox import RabbitBoxSource
@@ -36,4 +39,7 @@ SOURCES = [
     ParamountSource(),
     NeptuneSource(),
     MooreSource(),
+    ChopSueySource(),
+    SubstationSource(),
+    CentralSaloonSource(),
 ]

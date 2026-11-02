@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 from datetime import datetime
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup, Tag
 from requests import Session
@@ -12,17 +12,12 @@ from ..models import Event
 from ..util import TZ, clean, parse_datetime, stable_source_id
 
 
-OCCURRENCE_RE = re.compile(
-    r"\b(?P<month>Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\.?\s+"
-    r"(?P<day>\d{1,2})\s+"
-    r"(?P<time>\d{1,2}:\d{2}\s*[AP]M)\b",
+DATE_RE = re.compile(
+    r"\b(?P<month>Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+"
+    r"(?P<day>\d{1,2})\s+(?P<year>20\d{2})\b",
     re.I,
 )
-YEAR_RE = re.compile(r"\b(20\d{2})\b")
-END_TIME_RE = re.compile(
-    r"\b(?P<start>\d{1,2}:\d{2}\s*[AP]M)\s*-\s*(?P<end>\d{1,2}:\d{2}\s*[AP]M)\b",
-    re.I,
-)
+TIME_RE = re.compile(r"\b(\d{1,2}:\d{2}\s*[AP]M)\b", re.I)
 
 SKIP_TITLES = {
     "free paramount tour",
@@ -35,19 +30,13 @@ SKIP_TITLES = {
 class STGVenueSource(EventSource):
     base_url = "https://www.stgpresents.org"
 
-    def __init__(self, key: str, name: str, venue: str, path: str, address_fragment: str):
+    def __init__(self, key: str, name: str, venue: str, category_path: str):
         self.key = key
         self.name = name
         self.venue = venue
-        self.url = urljoin(self.base_url, path)
-        self.address_fragment = address_fragment.casefold()
+        self.url = urljoin(self.base_url, category_path)
 
-    def fetch_events(
-        self,
-        session: Session,
-        start: datetime,
-        end: datetime | None = None,
-    ) -> list[Event]:
+    def fetch_events(self, session: Session, start: datetime, end: datetime | None = None) -> list[Event]:
         response = session.get(
             self.url,
             timeout=30,
@@ -59,85 +48,57 @@ class STGVenueSource(EventSource):
             },
         )
         response.raise_for_status()
-        events = self.parse_listing(response.text, default_year=start.year)
+        events = self.parse_listing(response.text)
         return dedupe(
             e for e in events
             if e.start_at >= start and (end is None or e.start_at <= end)
         )
 
-    def parse_listing(self, html: str, default_year: int | None = None) -> list[Event]:
+    def parse_listing(self, html: str) -> list[Event]:
         soup = BeautifulSoup(html, "html.parser")
         events: list[Event] = []
         seen: set[str] = set()
 
-        # STG's venue pages render one occurrence row per performance. Anchor on
-        # the venue/address text, then climb to the smallest container with a
-        # title and an occurrence timestamp.
-        for text_node in soup.find_all(string=True):
-            raw = clean(str(text_node))
-            if self.address_fragment not in raw.casefold():
+        for heading in soup.find_all(["h3", "h4"]):
+            title = clean(heading.get_text(" ", strip=True))
+            if not title or title.casefold() in SKIP_TITLES:
                 continue
 
-            block = self._find_event_block(text_node.parent)
+            block = self._nearest_occurrence_container(heading)
             if block is None:
                 continue
 
             text = clean(block.get_text(" ", strip=True))
-            occurrence = OCCURRENCE_RE.search(text)
-            if not occurrence:
+            if self.venue.casefold() not in text.casefold():
                 continue
 
-            title = self._title(block)
-            if not title or title.casefold() in SKIP_TITLES:
+            date_match = DATE_RE.search(text)
+            time_match = TIME_RE.search(text)
+            if not date_match or not time_match:
                 continue
 
-            year_match = YEAR_RE.search(text)
-            year = int(year_match.group(1)) if year_match else (default_year or datetime.now(TZ).year)
             start_at = parse_datetime(
-                f"{occurrence.group('month')} {occurrence.group('day')}, "
-                f"{year} {occurrence.group('time')}"
+                f"{date_match.group('month')} {date_match.group('day')}, "
+                f"{date_match.group('year')} {time_match.group(1)}"
             )
             if start_at is None:
                 continue
 
             event_url = self._event_url(block) or self.url
-            ticket_url = self._ticket_url(block)
-
-            # Same production can have several performances. The STG page exposes
-            # each occurrence independently, so datetime is part of occurrence ID.
             base_id = stable_source_id(self.key, event_url, title)
             source_event_id = f"{base_id}:{start_at.strftime('%Y%m%dT%H%M')}"
             if source_event_id in seen:
                 continue
             seen.add(source_event_id)
 
-            end_at = None
-            time_range = END_TIME_RE.search(text)
-            if time_range:
-                end_at = parse_datetime(
-                    f"{occurrence.group('month')} {occurrence.group('day')}, "
-                    f"{year} {time_range.group('end')}"
-                )
-
             lower = text.casefold()
             status = "scheduled"
-            if "canceled" in lower or "cancelled" in lower:
+            if "cancelled" in lower or "canceled" in lower:
                 status = "cancelled"
             elif "postponed" in lower:
                 status = "postponed"
             elif "rescheduled" in lower:
                 status = "rescheduled"
-
-            image_url = None
-            image = block.find("img")
-            if image:
-                image_url = (
-                    image.get("src")
-                    or image.get("data-src")
-                    or image.get("data-lazy-src")
-                )
-                if image_url:
-                    image_url = urljoin(self.base_url, image_url)
 
             events.append(Event(
                 id=f"{self.key}:{source_event_id}",
@@ -146,73 +107,64 @@ class STGVenueSource(EventSource):
                 title=title,
                 venue=self.venue,
                 start_at=start_at.astimezone(TZ),
-                end_at=end_at.astimezone(TZ) if end_at else None,
                 event_url=event_url,
-                ticket_url=ticket_url,
-                image_url=image_url,
+                ticket_url=event_url,
                 status=status,
                 sold_out="sold out" in lower,
-                metadata={"platform": "stg_wordpress_calendar"},
+                metadata={"platform": "stg_venue_category"},
             ))
 
         return dedupe(events)
 
-    def _find_event_block(self, node: Tag) -> Tag | None:
-        current: Tag | None = node
-        best: Tag | None = None
-        for _ in range(14):
+    def _nearest_occurrence_container(self, heading: Tag) -> Tag | None:
+        current: Tag | None = heading
+        fallback: Tag | None = None
+
+        for _ in range(10):
             parent = current.parent if current else None
             if not isinstance(parent, Tag):
                 break
+
             text = clean(parent.get_text(" ", strip=True))
+            headings = parent.find_all(["h3", "h4"])
+            date_count = len(DATE_RE.findall(text))
+
             if (
-                self.address_fragment in text.casefold()
-                and OCCURRENCE_RE.search(text)
-                and parent.find(["h2", "h3", "h4"])
+                self.venue.casefold() in text.casefold()
+                and DATE_RE.search(text)
+                and TIME_RE.search(text)
             ):
-                best = parent
+                fallback = parent
 
-                # Return the smallest block that contains only one physical
-                # occurrence for this venue.
-                occurrence_count = len(OCCURRENCE_RE.findall(text))
-                venue_count = text.casefold().count(self.address_fragment)
-                if occurrence_count == 1 and venue_count == 1:
+                # Strong boundary: one title + one dated occurrence only.
+                if len(headings) == 1 and date_count == 1:
                     return parent
-            current = parent
-        return best
 
-    @staticmethod
-    def _title(block: Tag) -> str | None:
-        for tag in block.find_all(["h2", "h3", "h4"]):
-            value = clean(tag.get_text(" ", strip=True))
-            value = re.sub(r"\s*Repeating Event\s*$", "", value, flags=re.I)
-            if value:
-                return value
+            # Do not climb beyond a semantic event card if it already contains
+            # another title/date; that would mix neighboring venue rows.
+            if parent.name in {"article", "li"} and (len(headings) > 1 or date_count > 1):
+                break
+
+            current = parent
+
+        # Only accept fallback if it still represents exactly one heading/date.
+        if fallback is not None:
+            ftext = clean(fallback.get_text(" ", strip=True))
+            if (
+                len(fallback.find_all(["h3", "h4"])) == 1
+                and len(DATE_RE.findall(ftext)) == 1
+            ):
+                return fallback
         return None
 
     def _event_url(self, block: Tag) -> str | None:
-        # Heading links usually point to the canonical event detail page.
-        for heading in block.find_all(["h2", "h3", "h4"]):
-            a = heading.find("a", href=True)
-            if a:
-                return urljoin(self.base_url, a.get("href", ""))
-        for a in block.find_all("a", href=True):
-            label = clean(a.get_text(" ", strip=True)).casefold()
-            if "tickets & info" in label or "more info" in label:
-                return urljoin(self.base_url, a.get("href", ""))
-        return None
-
-    def _ticket_url(self, block: Tag) -> str | None:
-        # Prefer explicit ticket actions; preserve external ticket provider URL.
         for a in block.find_all("a", href=True):
             label = clean(a.get_text(" ", strip=True)).casefold()
             href = urljoin(self.base_url, a.get("href", ""))
-            if (
-                "get tickets" in label
-                or label == "tickets"
-                or "buy tickets" in label
-            ):
+            if label and label not in {"tickets & info", "get tickets"}:
                 return href
+        for a in block.find_all("a", href=True):
+            return urljoin(self.base_url, a.get("href", ""))
         return None
 
 
@@ -221,8 +173,7 @@ def ParamountSource() -> STGVenueSource:
         "paramount",
         "The Paramount Theatre",
         "The Paramount Theatre",
-        "/stg-venues/paramount-theatre/events/",
-        "911 Pine St",
+        "/event-category/paramount/",
     )
 
 
@@ -231,8 +182,7 @@ def NeptuneSource() -> STGVenueSource:
         "neptune",
         "The Neptune Theatre",
         "The Neptune Theatre",
-        "/stg-venues/neptune-theatre/events/",
-        "1303 Northeast 45th Street",
+        "/event-category/neptune/",
     )
 
 
@@ -241,6 +191,5 @@ def MooreSource() -> STGVenueSource:
         "moore",
         "The Moore Theatre",
         "The Moore Theatre",
-        "/stg-venues/moore-theatre/events/",
-        "1932 Second Avenue",
+        "/event-category/moore/",
     )
