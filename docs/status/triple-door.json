@@ -1,8 +1,7 @@
 {
   "source": "triple-door",
-  "success": false,
-  "generated_at": "2026-11-01T22:44:47.925012-08:00",
-  "code": "source_parse_error",
-  "message": "triple-door: source returned zero upcoming events",
-  "exception_type": "ValueError"
+  "success": true,
+  "generated_at": "2026-11-01T23:09:12.296488-08:00",
+  "event_count": 30,
+  "feed": "feeds/triple-door.xml"
 }
