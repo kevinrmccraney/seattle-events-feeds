@@ -4,6 +4,9 @@ from .dice import DiceVeraSource
 from .showbox import ShowboxSource
 from .tractor import TractorSource
 from .nectar import NectarSource, HiddenHallSource
+from .royalroom import RoyalRoomSource
+from .jazzalley import JazzAlleySource
+from .elcorazon import ElCorazonSource, FunhouseSource
 
 SOURCES = [
     CarbonhouseSource("neumos", "Neumos", "https://www.neumos.com", "Neumos"),
@@ -14,4 +17,8 @@ SOURCES = [
     ClockOutSource(),
     NectarSource(),
     HiddenHallSource(),
+    ElCorazonSource(),
+    FunhouseSource(),
+    JazzAlleySource(),
+    RoyalRoomSource(),
 ]

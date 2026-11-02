@@ -99,3 +99,17 @@ The public Nectar calendar contains events for both Nectar Lounge and Hidden Hal
 - `feeds/hidden-hall.xml`
 
 Routing uses the actual venue rendered on each calendar card. Tixr's numeric event ID is used as the stable source ID. Events explicitly located at other rooms are excluded from these feeds.
+
+
+## v7 sources
+
+Adds normalized feeds for:
+
+- `el-corazon.xml`
+- `funhouse.xml`
+- `jazz-alley.xml`
+- `royal-room.xml`
+
+El Corazón/Funhouse share the venue calendar but are routed by physical venue.
+Jazz Alley is modeled as one normalized event per individual performance. The underlying `shownum` is combined with the specific performance datetime for stable identity.
+Royal Room uses its public events listing and excludes explicit maintenance closures.
