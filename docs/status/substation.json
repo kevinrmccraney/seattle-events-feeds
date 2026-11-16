@@ -1,7 +1,7 @@
 {
   "source": "substation",
   "success": false,
-  "generated_at": "2026-11-09T14:58:32.576010-08:00",
+  "generated_at": "2026-11-16T14:52:31.792907-08:00",
   "code": "source_http_error",
   "message": "403 Client Error: Forbidden for url: https://www.axs.com/venues/131334/substation-seattle-tickets",
   "exception_type": "HTTPError"
