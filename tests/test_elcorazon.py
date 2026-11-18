@@ -36,6 +36,38 @@ class ElCorazonTests(unittest.TestCase):
         self.assertEqual(e.start_at.hour, 19)
         self.assertEqual(e.doors_time, "6:00 PM")
 
+    def test_shared_calendar_does_not_copy_one_lineup_onto_other_shows(self):
+        html = '''
+        <div class="page">
+          <div class="empty-state">No items found.</div>
+          <a href="/shows/dadbaud-la-luxx-wet-peynt-17-nov">No items found.</a>
+          <a href="/shows/fear-factory-20-nov">No items found.</a>
+          <div class="event-div-cal">
+            <a href="/shows/dadbaud-la-luxx-wet-peynt-17-nov"></a>
+            <div>SEB EL ZIN</div>
+            <div>wet peynt, La Luxx, Dadbaud, cyranetic</div>
+            <div>November 17, 2026</div>
+            <div>7:00 pm</div><div>8:00 pm</div>
+            <div>The Funhouse</div>
+          </div>
+          <div class="event-div-cal">
+            <a href="/shows/fear-factory-20-nov"></a>
+            <div>Fear Factory - Cybernetic Domination Tour 2026</div>
+            <div>November 20, 2026</div>
+            <div>6:00 pm</div><div>7:00 pm</div>
+            <div>El Corazón</div>
+          </div>
+        </div>
+        '''
+        corazon = ElCorazonSource().parse_calendar(html)
+        funhouse = FunhouseSource().parse_calendar(html)
+        self.assertEqual([event.title for event in corazon], ["Fear Factory - Cybernetic Domination Tour 2026"])
+        self.assertEqual(corazon[0].start_at.day, 20)
+        self.assertNotEqual(corazon[0].support, "wet peynt, La Luxx, Dadbaud, cyranetic")
+        self.assertEqual([event.title for event in funhouse], ["SEB EL ZIN"])
+        self.assertEqual(funhouse[0].support, "wet peynt, La Luxx, Dadbaud, cyranetic")
+        self.assertEqual(funhouse[0].start_at.day, 17)
+
     def test_routes_funhouse_from_internal_show_link(self):
         events = FunhouseSource().parse_calendar(FIXTURE)
         self.assertEqual(len(events), 1)

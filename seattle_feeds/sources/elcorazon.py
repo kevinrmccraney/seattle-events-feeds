@@ -77,7 +77,7 @@ class ElCorazonCalendarSource(EventSource):
             title, support, promoter = self._extract_title_support_promoter(lines, date_match.group(0))
             if not title:
                 title = self._title_from_anchor(anchor)
-            if not title:
+            if not title or title.casefold() in {"no items found.", "no items found"}:
                 continue
 
             slug = urlparse(href).path.rstrip("/").split("/")[-1]
@@ -131,13 +131,26 @@ class ElCorazonCalendarSource(EventSource):
         return normalized == "the funhouse"
 
     @classmethod
+    def _show_links(cls, node: Tag) -> set[str]:
+        links = set()
+        for anchor in node.find_all("a", href=True):
+            href = urljoin(cls.base_url, anchor.get("href", ""))
+            if SHOW_PATH_RE.search(urlparse(href).path):
+                links.add(urlparse(href).path.rstrip("/"))
+        return links
+
+    @classmethod
     def _find_card(cls, anchor: Tag) -> Tag | None:
         node: Tag | None = anchor
-        best: Tag | None = None
         for _ in range(12):
             parent = node.parent if node else None
             if not isinstance(parent, Tag):
                 break
+            show_links = cls._show_links(parent)
+            # A shared calendar container repeats the first show's title and
+            # lineup onto every other link. Stop before that container.
+            if len(show_links) > 1:
+                return None
             text = clean(parent.get_text(" ", strip=True))
             has_date = bool(DATE_RE.search(text))
             has_time = bool(TIME_RE.search(text))
@@ -147,13 +160,10 @@ class ElCorazonCalendarSource(EventSource):
                 or clean(v).casefold().endswith(" - el corazon")
                 for v in parent.stripped_strings
             )
-            if has_date and has_time and has_venue:
-                best = parent
-                show_links = [a for a in parent.find_all("a", href=True) if SHOW_PATH_RE.search(urlparse(urljoin(cls.base_url, a.get("href", ""))).path)]
-                if len(show_links) == 1:
-                    return parent
+            if has_date and has_time and has_venue and len(show_links) == 1:
+                return parent
             node = parent
-        return best
+        return None
 
     @staticmethod
     def _title_from_anchor(anchor: Tag) -> str | None:
@@ -174,7 +184,14 @@ class ElCorazonCalendarSource(EventSource):
         candidates = []
         for v in lines[:date_index]:
             lower = v.lower()
-            if lower in {"image", "this is some text inside of a div block.", "buy tickets", "get tickets"}:
+            if lower in {
+                "image",
+                "this is some text inside of a div block.",
+                "buy tickets",
+                "get tickets",
+                "no items found.",
+                "no items found",
+            }:
                 continue
             if re.fullmatch(r"\w{3}\s+\d{1,2}", v):
                 continue
