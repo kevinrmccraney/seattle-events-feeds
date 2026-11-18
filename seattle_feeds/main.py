@@ -27,6 +27,7 @@ INVENTORY_MINIMUMS = {
     "rabbit-box": 15,
     "fremont-abbey": 5,
     "ballard-homestead": 3,
+    "sea-monster": 8,
 }
 
 SOURCE_LINKS = {
@@ -50,11 +51,12 @@ SOURCE_LINKS = {
     "rabbit-box": "https://www.therabbitboxseattle.com/events",
     "fremont-abbey": "https://www.fremontabbey.org/calendar/",
     "ballard-homestead": "https://www.fremontabbey.org/calendar/",
-    "paramount": "https://www.axs.com/venues/101582/paramount-theatre-seattle-seattle-tickets",
-    "neptune": "https://www.axs.com/venues/102572/the-neptune-theatre-seattle-tickets",
-    "moore": "https://www.axs.com/venues/101610/the-moore-theatre-seattle-tickets",
-    "chop-suey": "https://www.ticketweb.com/venue/chop-suey-seattle-wa/19270",
-    "substation": "https://www.axs.com/venues/131334/substation-seattle-tickets",
+    "paramount": "https://www.stgpresents.org/event-category/paramount/",
+    "neptune": "https://www.stgpresents.org/event-category/neptune/",
+    "moore": "https://www.stgpresents.org/event-category/moore/",
+    "chop-suey": "https://chopsuey.com/",
+    "substation": "https://substationseattle.com/",
+    "sea-monster": "https://www.seamonsterlounge.com/",
     "central-saloon": "https://centralsaloon.com/events/",
 }
 

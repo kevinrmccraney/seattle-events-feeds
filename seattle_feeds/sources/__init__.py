@@ -1,5 +1,5 @@
 from .centralsaloon import CentralSaloonSource
-from .axsvenue import SubstationSource
+from .substation import SubstationSource
 from .chopsuey import ChopSueySource
 from .crocodile import CrocodileSource, SunsetTavernSource, BelltownYachtClubSource, BabaYagaSource, ShowboxCrocodileSource
 from .tripledoor import TripleDoorSource
@@ -13,7 +13,8 @@ from .nectar import NectarSource, HiddenHallSource
 from .royalroom import RoyalRoomSource
 from .jazzalley import JazzAlleySource
 from .elcorazon import ElCorazonSource, FunhouseSource
-from .axsvenue import ParamountSource, NeptuneSource, MooreSource
+from .stg import ParamountSource, NeptuneSource, MooreSource
+from .seamonster import SeaMonsterSource
 
 SOURCES = [
     CarbonhouseSource("neumos", "Neumos", "https://www.neumos.com", "Neumos"),
@@ -42,4 +43,5 @@ SOURCES = [
     ChopSueySource(),
     SubstationSource(),
     CentralSaloonSource(),
+    SeaMonsterSource(),
 ]
