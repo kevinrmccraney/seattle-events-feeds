@@ -15,6 +15,7 @@ from .jazzalley import JazzAlleySource
 from .elcorazon import ElCorazonSource, FunhouseSource
 from .stg import ParamountSource, NeptuneSource, MooreSource
 from .seamonster import SeaMonsterSource
+from .zoo import WoodlandParkZooSource
 
 SOURCES = [
     CarbonhouseSource("neumos", "Neumos", "https://www.neumos.com", "Neumos"),
@@ -44,4 +45,5 @@ SOURCES = [
     SubstationSource(),
     CentralSaloonSource(),
     SeaMonsterSource(),
+    WoodlandParkZooSource(),
 ]

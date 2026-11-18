@@ -57,6 +57,7 @@ SOURCE_LINKS = {
     "chop-suey": "https://chopsuey.com/",
     "substation": "https://substationseattle.com/",
     "sea-monster": "https://www.seamonsterlounge.com/",
+    "woodland-park-zoo": "https://zoo.org/events/",
     "central-saloon": "https://centralsaloon.com/events/",
 }
 
